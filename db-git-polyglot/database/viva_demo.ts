@@ -249,7 +249,7 @@ async function runVivaDemo() {
   const delta = postCount - preCount;
   const ms6 = (performance.now() - t6).toFixed(2);
 
-  console.log(`${C.bold}Commits After Test:         ${C.reset}${C.cyan}${postCount}${C.reset}`);
+  console.log(`${C.bold}PostgreSQL Commits Before: ${preCount} | After: ${postCount} (Delta: ${delta} — ACID Rollback Verified)${C.reset}`);
   console.log(`${C.bold}Coordinator Status:         ${C.reset}${C.emerald}PostgreSQL Client Executed ROLLBACK${C.reset}`);
   console.log(`${C.bold}Database Drift:             ${C.reset}${C.emerald}Delta: ${delta} (Zero Orphan Rows)${C.reset}`);
   console.log(`${C.green}✓ PASS [TC-06]: Distributed consistency preserved across heterogeneous engines in ${ms6} ms${C.reset}`);

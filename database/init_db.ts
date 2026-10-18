@@ -158,6 +158,18 @@ export async function initializeDatabase(options: { closeConnections?: boolean }
   console.log('\nPostgreSQL Stored Functions:');
   procRes.rows.forEach((r: { routine_name: string }) => console.log(`  - ${r.routine_name}()`));
 
+  // Verify PostgreSQL Indexes
+  const idxRes = await query(`
+    SELECT indexname, tablename
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+    ORDER BY tablename, indexname;
+  `);
+  console.log('\nPostgreSQL Indexes Active:');
+  idxRes.rows.forEach((r: { indexname: string; tablename: string }) =>
+    console.log(`  - ${r.indexname} ON ${r.tablename}`)
+  );
+
   // Verify Neo4j Constraints
   const neoConstraints = await runCypher('SHOW CONSTRAINTS');
   console.log('\nNeo4j Constraints Active:');
