@@ -444,20 +444,20 @@ function AnalyticsDashboardContent() {
             <span className="text-[10px] font-mono uppercase tracking-wider text-[#8B949E]">Viva Presets:</span>
             {[
               {
-                label: 'Storage View',
+                label: 'Storage Deduplication View',
                 sql: `SELECT * FROM v_repo_storage_efficiency WHERE repo_id = '${repoId}';`,
               },
               {
-                label: 'Recursive Lineage',
+                label: 'Recursive Commit Lineage',
                 sql: `WITH RECURSIVE ca AS (\n  SELECT commit_hash, parent_commit_hash, message, 0 AS depth\n  FROM commits\n  WHERE repo_id = '${repoId}' AND parent_commit_hash IS NULL\n  UNION ALL\n  SELECT c.commit_hash, c.parent_commit_hash, c.message, ca.depth + 1\n  FROM commits c JOIN ca ON c.parent_commit_hash = ca.commit_hash\n)\nSELECT depth, commit_hash, message FROM ca ORDER BY depth ASC;`,
               },
               {
-                label: 'High-Churn Files (HAVING)',
+                label: 'High-Churn Files HAVING',
                 sql: `SELECT tn.file_path, COUNT(DISTINCT c.commit_hash) AS commits\nFROM tree_nodes tn\nJOIN commits c ON tn.tree_hash = c.tree_hash\nWHERE c.repo_id = '${repoId}'\nGROUP BY tn.file_path\nHAVING COUNT(DISTINCT c.commit_hash) >= 2;`,
               },
               {
-                label: 'HNSW Cosine Vector Scan',
-                sql: `SELECT commit_hash, message, created_at\nFROM commits\nWHERE repo_id = '${repoId}' AND msg_embedding IS NOT NULL\nORDER BY msg_embedding <=> (SELECT msg_embedding FROM commits WHERE repo_id = '${repoId}' LIMIT 1) ASC\nLIMIT 5;`,
+                label: 'EXPLAIN ANALYZE HNSW Vector Search',
+                sql: `EXPLAIN (ANALYZE, BUFFERS)\nSELECT commit_hash, message\nFROM commits\nWHERE repo_id = '${repoId}' AND msg_embedding IS NOT NULL\nORDER BY msg_embedding <=> (SELECT msg_embedding FROM commits WHERE repo_id = '${repoId}' LIMIT 1) ASC\nLIMIT 5;`,
               },
             ].map((preset) => (
               <button

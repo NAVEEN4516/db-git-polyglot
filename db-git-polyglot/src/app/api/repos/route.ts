@@ -18,11 +18,7 @@ export async function GET(req: NextRequest) {
     await client.query('BEGIN');
 
     // Set transaction-local RLS session variable for app.current_user_id
-    if (userId) {
-      await client.query(`SELECT set_config('app.current_user_id', $1, true);`, [userId]);
-    } else {
-      await client.query(`SELECT set_config('app.current_user_id', '', true);`);
-    }
+    await client.query("SELECT set_config('app.current_user_id', $1, true);", [userId || '']);
 
     let sql = `
       SELECT

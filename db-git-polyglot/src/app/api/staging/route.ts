@@ -26,11 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     await client.query('BEGIN');
-    if (userId) {
-      await client.query("SELECT set_config('app.current_user_id', $1, true);", [userId]);
-    } else {
-      await client.query("SELECT set_config('app.current_user_id', '', true);");
-    }
+    await client.query("SELECT set_config('app.current_user_id', $1, true);", [userId || '']);
 
     // 1. Fetch current branch target commit and its committed snapshot files
     const branchRes = await client.query(

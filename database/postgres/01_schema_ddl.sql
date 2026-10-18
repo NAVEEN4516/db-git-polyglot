@@ -95,5 +95,9 @@ CREATE TABLE IF NOT EXISTS repo_head (
 
 CREATE INDEX IF NOT EXISTS idx_tree_nodes_lookup ON tree_nodes(tree_hash, file_path);
 CREATE INDEX IF NOT EXISTS idx_commits_repo_created ON commits(repo_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_commits_parent_hash ON commits(parent_commit_hash);
 CREATE INDEX IF NOT EXISTS idx_commits_fts ON commits USING GIN (to_tsvector('english', message));
-CREATE INDEX IF NOT EXISTS idx_commits_embedding_hnsw ON commits USING hnsw (msg_embedding vector_cosine_ops);
+DROP INDEX IF EXISTS idx_commits_embedding_hnsw;
+CREATE INDEX IF NOT EXISTS idx_commits_msg_embedding_hnsw
+ON commits USING hnsw (msg_embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
