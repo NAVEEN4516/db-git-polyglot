@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0d1117;
+  --foreground: #c9d1d9;
+  --panel: #161b22;
+  --border: #30363d;
+  --border-muted: #21262d;
+  --accent-blue: #2f81f7;
+  --accent-green: #238636;
+  --accent-emerald: #10b981;
+  --accent-amber: #d29922;
+  --accent-red: #f85149;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  background-color: #0d1117;
+  color: #c9d1d9;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar for Primer/Supabase look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Dot grid for graph canvas and dashboard backgrounds */
+.bg-dot-grid {
+  background-image: radial-gradient(#21262d 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+.bg-dot-grid-dense {
+  background-image: radial-gradient(#30363d 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Shimmer animation for loading states */
+@keyframes shimmer {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite ease-in-out;
+}

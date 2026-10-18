@@ -1,0 +1,65 @@
+﻿================================================================================
+DBMS MINI PROJECT - FOLDER DIRECTORY STRUCTURE & FILE LISTING
+Generated: 2026-10-17 19:58:11
+Workspace: C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT
+================================================================================
+
+--- DIRECTORY TREE ---
+Folder PATH listing for volume Windows-SSD
+Volume serial number is 32AA-2A4E
+C:.
+|   Comprehensive_Project_Documentation_Refined (1).docx
+|   DBMS Level 3 Project Requirements draft.pdf
+|   DB_Git_Complete_Implementation_Plan.pdf
+|   
++---cli
++---db
++---documents
+|       Comprehensive_Project_Documentation_Refined (1).docx
+|       DBMS Level 3 Project Requirements draft.pdf
+|       DB_Git_Complete_Implementation_Plan.pdf
+|       folder_directory.txt
+|       
+\---web
+    +---app
+    |   \---api
+    |       +---analytics
+    |       +---benchmark
+    |       +---branches
+    |       +---commits
+    |       +---files
+    |       +---health
+    |       +---lca
+    |       \---seed
+    +---components
+    \---lib
+
+--- COMPLETE FILE & FOLDER LIST ---
+
+FullName                                                                                                               
+--------                                                                                                               
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\cli                                                         
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\db                                                          
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\documents                                                   
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web                                                         
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\Comprehensive_Project_Documentation_Refined (1).docx        
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\DBMS Level 3 Project Requirements draft.pdf                 
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\DB_Git_Complete_Implementation_Plan.pdf                     
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\documents\Comprehensive_Project_Documentation_Refined (1)...
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\documents\DBMS Level 3 Project Requirements draft.pdf       
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\documents\DB_Git_Complete_Implementation_Plan.pdf           
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\documents\folder_directory.txt                              
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app                                                     
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\components                                              
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\lib                                                     
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api                                                 
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\analytics                                       
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\benchmark                                       
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\branches                                        
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\commits                                         
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\files                                           
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\health                                          
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\lca                                             
+C:\Users\LENOVO\OneDrive - PESUNIVERSITY\DBMS MINI PROJECT\web\app\api\seed                                            
+
+

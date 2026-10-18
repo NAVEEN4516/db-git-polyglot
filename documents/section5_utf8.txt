@@ -1,0 +1,266 @@
+--- SECTION 5.1 ---
+5.1 PostgreSQL Core DDL & CHECK Constraints (/database/postgres/01_schema_ddl.sql)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL CHECK (char_length(username) >= 3),
+    email VARCHAR(100) UNIQUE NOT NULL CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-
+Za-z]{2,}$'),
+    password_hash VARCHAR(255) NOT NULL,
+    system_role VARCHAR(20) NOT NULL DEFAULT 'USER' CHECK (system_role IN ('ADMIN', 'USER')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE repositories (
+    repo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    repo_name VARCHAR(100) NOT NULL CHECK (repo_name ~ '^[A-Za-z0-9._-]+$'),
+    description TEXT DEFAULT '',
+    is_private BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(owner_id, repo_name)
+);
+CREATE TABLE repo_collaborators (
+    repo_id UUID NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    access_role VARCHAR(20) NOT NULL CHECK (access_role IN ('OWNER', 'MAINTAINER', 
+'CONTRIBUTOR', 'VIEWER')),
+    granted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (repo_id, user_id)
+);
+CREATE TABLE blobs (
+    blob_hash CHAR(64) PRIMARY KEY CHECK (blob_hash ~ '^[0-9a-f]{64}$'),
+    content BYTEA NOT NULL,
+    size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE trees (
+    tree_hash CHAR(64) PRIMARY KEY CHECK (tree_hash ~ '^[0-9a-f]{64}$'),
+    repo_id UUID NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE tree_nodes (
+    tree_hash CHAR(64) NOT NULL REFERENCES trees(tree_hash) ON DELETE CASCADE,
+    file_path VARCHAR(512) NOT NULL CHECK (char_length(file_path) > 0),
+    parent_dir_path VARCHAR(512) DEFAULT NULL,
+    is_directory BOOLEAN DEFAULT FALSE,
+    blob_hash CHAR(64) REFERENCES blobs(blob_hash),
+    file_mode VARCHAR(10) NOT NULL DEFAULT '100644' CHECK (file_mode IN ('100644', '100755', 
+'040000', '120000')),
+    PRIMARY KEY (tree_hash, file_path)
+);
+CREATE TABLE staging_index (
+    repo_id UUID NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    file_path VARCHAR(512) NOT NULL CHECK (char_length(file_path) > 0),
+    blob_hash CHAR(64) NOT NULL REFERENCES blobs(blob_hash),
+    file_mode VARCHAR(10) NOT NULL DEFAULT '100644' CHECK (file_mode IN ('100644', '100755')),
+=== PAGE 10 ===
+Page 10 of 16DB-Git One-Shot Implementation Plan | PES1UG24AM379 & PES1UG24AM381
+    staged_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (repo_id, user_id, file_path)
+);
+CREATE TABLE commits (
+    commit_hash CHAR(64) PRIMARY KEY CHECK (commit_hash ~ '^[0-9a-f]{64}$'),
+    repo_id UUID NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    author_id UUID NOT NULL REFERENCES users(user_id),
+    parent_commit_hash CHAR(64) REFERENCES commits(commit_hash),
+    tree_hash CHAR(64) NOT NULL REFERENCES trees(tree_hash),
+    message TEXT NOT NULL CHECK (char_length(trim(message)) > 0),
+    msg_embedding vector(384),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE branches (
+    branch_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    repo_id UUID NOT NULL REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    branch_name VARCHAR(100) NOT NULL CHECK (branch_name ~ '^[A-Za-z0-9._/-]+$'),
+    target_commit_hash CHAR(64) REFERENCES commits(commit_hash),
+    is_default BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(repo_id, branch_name)
+);
+CREATE TABLE repo_head (
+    repo_id UUID PRIMARY KEY REFERENCES repositories(repo_id) ON DELETE CASCADE,
+    current_branch_id UUID REFERENCES branches(branch_id) ON DELETE SET NULL,
+    is_detached BOOLEAN NOT NULL DEFAULT FALSE,
+    detached_commit_hash CHAR(64) REFERENCES commits(commit_hash),
+    CHECK (
+        (is_detached = FALSE AND current_branch_id IS NOT NULL AND detached_commit_hash IS NULL) 
+OR
+        (is_detached = TRUE  AND detached_commit_hash IS NOT NULL)
+    )
+);
+CREATE INDEX idx_tree_nodes_lookup ON tree_nodes(tree_hash, file_path);
+CREATE INDEX idx_commits_repo_created ON commits(repo_id, created_at DESC);
+CREATE INDEX idx_commits_fts ON commits USING GIN (to_tsvector('english', message));
+CREATE INDEX idx_commits_embedding_hnsw ON commits USING hnsw (msg_embedding vector_cosine_ops);
+
+--- SECTION 5.2 ---
+5.2 Views, Schema Migrations & Database RBAC/RLS (/database/postgres/02_views_rbac_rls.sql)
+-- Schema Evolution (ALTER & DROP)
+ALTER TABLE repositories ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS temp_migration_audit (audit_id SERIAL PRIMARY KEY, note TEXT);
+DROP TABLE IF EXISTS temp_migration_audit;
+-- Storage Deduplication View
+CREATE OR REPLACE VIEW v_repo_storage_efficiency AS
+SELECT
+    r.repo_id,
+    r.repo_name,
+    COUNT(DISTINCT b.blob_hash) AS unique_blobs_count,
+    COALESCE(SUM(DISTINCT b.size_bytes), 0) AS physical_bytes_stored,
+    COALESCE(SUM(b.size_bytes), 0) AS logical_uncompressed_bytes,
+    ROUND(
+        (1.0 - (COALESCE(SUM(DISTINCT b.size_bytes), 0)::numeric /
+        NULLIF(SUM(b.size_bytes), 0)::numeric)) * 100, 2
+    ) AS deduplication_savings_pct
+FROM repositories r
+LEFT JOIN trees t ON r.repo_id = t.repo_id
+LEFT JOIN tree_nodes tn ON t.tree_hash = tn.tree_hash
+LEFT JOIN blobs b ON tn.blob_hash = b.blob_hash
+=== PAGE 11 ===
+Page 11 of 16DB-Git One-Shot Implementation Plan | PES1UG24AM379 & PES1UG24AM381
+GROUP BY r.repo_id, r.repo_name;
+-- Native PostgreSQL Roles, Grants & Row-Level Security (Rubric #12)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dbgit_admin_role') THEN
+        CREATE ROLE dbgit_admin_role;
+        CREATE ROLE dbgit_contributor_role;
+        CREATE ROLE dbgit_viewer_role;
+    END IF;
+END $$;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO dbgit_admin_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON staging_index, branches, repo_head TO 
+dbgit_contributor_role;
+GRANT SELECT, INSERT ON blobs, trees, tree_nodes, commits TO dbgit_contributor_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO dbgit_viewer_role;
+ALTER TABLE repositories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS repo_visibility_policy ON repositories;
+CREATE POLICY repo_visibility_policy ON repositories
+FOR SELECT USING (
+    is_private = FALSE
+    OR current_setting('app.current_user_id', TRUE) IS NULL
+    OR owner_id = NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID
+    OR EXISTS (
+        SELECT 1 FROM repo_collaborators rc
+        WHERE rc.repo_id = repositories.repo_id
+          AND rc.user_id = NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID
+    )
+);
+
+--- SECTION 5.3 ---
+5.3 Immutability Triggers & PL/pgSQL Stored Function
+(/database/postgres/03_triggers_procs.sql)
+CREATE OR REPLACE FUNCTION prevent_historical_modification()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Cryptographic Integrity Violation: % records are immutable and cannot be 
+modified or deleted.', TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_immutable_blobs ON blobs;
+CREATE TRIGGER trg_immutable_blobs
+BEFORE UPDATE OR DELETE ON blobs
+FOR EACH ROW EXECUTE FUNCTION prevent_historical_modification();
+DROP TRIGGER IF EXISTS trg_immutable_commits ON commits;
+CREATE TRIGGER trg_immutable_commits
+BEFORE UPDATE OR DELETE ON commits
+FOR EACH ROW EXECUTE FUNCTION prevent_historical_modification();
+CREATE OR REPLACE FUNCTION fn_create_atomic_commit(
+    p_commit_hash CHAR(64),
+    p_repo_id UUID,
+    p_author_id UUID,
+    p_parent_hash CHAR(64),
+    p_branch_name VARCHAR(100),
+    p_tree_hash CHAR(64),
+    p_message TEXT,
+    p_embedding vector(384)
+) RETURNS CHAR(64) AS $$
+DECLARE
+=== PAGE 12 ===
+Page 12 of 16DB-Git One-Shot Implementation Plan | PES1UG24AM379 & PES1UG24AM381
+    v_role VARCHAR(20);
+BEGIN
+    SELECT access_role INTO v_role
+    FROM repo_collaborators
+    WHERE repo_id = p_repo_id AND user_id = p_author_id;
+    IF v_role IS NULL OR v_role = 'VIEWER' THEN
+        RAISE EXCEPTION 'RBAC Authorization Denied: User lacks write privileges on repository 
+%', p_repo_id;
+    END IF;
+    INSERT INTO commits (commit_hash, repo_id, author_id, parent_commit_hash, tree_hash, 
+message, msg_embedding)
+    VALUES (p_commit_hash, p_repo_id, p_author_id, p_parent_hash, p_tree_hash, p_message, 
+p_embedding);
+    UPDATE branches
+    SET target_commit_hash = p_commit_hash, updated_at = CURRENT_TIMESTAMP
+    WHERE repo_id = p_repo_id AND branch_name = p_branch_name;
+    DELETE FROM staging_index
+    WHERE repo_id = p_repo_id AND user_id = p_author_id;
+    RETURN p_commit_hash;
+END;
+$$ LANGUAGE plpgsql;
+
+--- SECTION 5.5 ---
+5.5 Neo4j Creation, LCA Merge-Base & Full RUD Cypher Suite
+(/database/neo4j/02_dag_lca_rud_queries.cypher)
+// A. CONSTRAINTS & INDEXES (Run once in Neo4j Browser)
+CREATE CONSTRAINT commit_hash_unique IF NOT EXISTS FOR (c:Commit) REQUIRE c.hash IS UNIQUE;
+CREATE CONSTRAINT tag_repo_unique IF NOT EXISTS FOR (t:Tag) REQUIRE (t.repo_id, t.name) IS 
+UNIQUE;
+CREATE INDEX commit_repo_idx IF NOT EXISTS FOR (c:Commit) ON (c.repo_id, c.timestamp);
+// B. CREATE COMMIT & PARENT EDGES (Called inside Two-Phase Polyglot Commit)
+MERGE (c:Commit {hash: $commit_hash})
+ON CREATE SET c.repo_id = $repo_id, c.author_id = $author_id, c.message = $message,
+              c.ci_status = 'PENDING', c.timestamp = $timestamp
+WITH c
+UNWIND $parent_hashes AS p_hash
+MATCH (parent:Commit {hash: p_hash})
+MERGE (c)-[:PARENT]->(parent);
+// C. READ 1: BOUNDED DAG LINEAGE FOR NEXT.JS GRAPH CANVAS
+MATCH (c:Commit {repo_id: $repo_id})
+OPTIONAL MATCH (c)-[:PARENT]->(p:Commit)
+OPTIONAL MATCH (t:Tag {repo_id: $repo_id})-[:TARGETS]->(c)
+RETURN c.hash AS hash, c.message AS message, c.ci_status AS ci_status, c.timestamp AS timestamp,
+       collect(DISTINCT p.hash) AS parents, collect(DISTINCT t.name) AS tags
+ORDER BY c.timestamp DESC LIMIT 200;
+// D. READ 2: SAFE LOWEST COMMON ANCESTOR (LCA) FOR 3-WAY MERGE BASE
+MATCH p1 = (b1:Commit {hash: $branch_a_head})-[:PARENT*0..100]->(lca:Commit),
+      p2 = (b2:Commit {hash: $branch_b_head})-[:PARENT*0..100]->(lca)
+WITH lca, (length(p1) + length(p2)) AS total_distance, length(p1) AS dist_a, length(p2) AS 
+dist_b
+ORDER BY total_distance ASC
+RETURN lca.hash AS merge_base_hash, lca.message AS merge_base_message, dist_a, dist_b LIMIT 1;
+// E. READ 3: NOSQL GRAPH AGGREGATION (ROOT vs. STANDARD vs. MERGE COMMITS)
+=== PAGE 14 ===
+Page 14 of 16DB-Git One-Shot Implementation Plan | PES1UG24AM379 & PES1UG24AM381
+MATCH (c:Commit {repo_id: $repo_id})
+OPTIONAL MATCH (c)-[r:PARENT]->(p:Commit)
+WITH c, COUNT(r) AS parent_count
+RETURN CASE WHEN parent_count > 1 THEN 'Merge Commit'
+            WHEN parent_count = 1 THEN 'Standard Commit'
+            ELSE 'Root Commit' END AS commit_type,
+       COUNT(c) AS total_commits
+ORDER BY total_commits DESC;
+// F. UPDATE (SET): UPDATE CI STATUS OR CREATE/MOVE RELEASE TAG
+MATCH (c:Commit {hash: $commit_hash, repo_id: $repo_id})
+SET c.ci_status = $new_ci_status, c.verified_at = timestamp()
+RETURN c.hash AS hash, c.ci_status AS ci_status;
+MERGE (t:Tag {repo_id: $repo_id, name: $tag_name})
+WITH t
+OPTIONAL MATCH (t)-[old_rel:TARGETS]->(:Commit)
+DELETE old_rel
+WITH t
+MATCH (target:Commit {hash: $target_commit_hash, repo_id: $repo_id})
+CREATE (t)-[:TARGETS {updated_at: timestamp()}]->(target)
+SET t.updated_at = timestamp()
+RETURN t.name AS tag, target.hash AS target_hash;
+// G. DELETE (DETACH DELETE): GARBAGE COLLECTION (dbgit gc) OF ORPHAN COMMITS
+MATCH (c:Commit {repo_id: $repo_id})
+WHERE NOT EXISTS {
+    MATCH (head:Commit {repo_id: $repo_id})-[:PARENT*0..100]->(c)
+    WHERE head.hash IN $active_branch_head_hashes
+}
+DETACH DELETE c
+RETURN COUNT(c) AS pruned_orphan_commits;
+6. "What Is Going On Under the Hood" — 
