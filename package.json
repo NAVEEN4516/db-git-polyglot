@@ -1,0 +1,14 @@
+{
+  "name": "db-git-polyglot-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix db-git-polyglot run dev",
+    "build": "npm --prefix db-git-polyglot run build",
+    "start": "npm --prefix db-git-polyglot run start",
+    "lint": "npm --prefix db-git-polyglot run lint",
+    "db:init": "npm --prefix db-git-polyglot run db:init",
+    "db:seed": "npm --prefix db-git-polyglot run db:seed",
+    "viva": "npm --prefix db-git-polyglot run viva"
+  }
+}
